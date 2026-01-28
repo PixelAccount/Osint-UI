@@ -1,40 +1,88 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 clear
 
-BANNER() {
-    echo "===================================="
-    echo "        OSINT WEB UI (Shell)"
-    echo "   Passive intelligence for websites"
-    echo "===================================="
+banner() {
+    echo "==============================="
+    echo "      OSINT WEB MINI UI"
+    echo "   Portable • Passive • Simple"
+    echo "==============================="
 }
 
-PAUSE() {
+pause() {
     echo
-    read -p "Press Enter to continue..."
+    printf "Press Enter to continue..."
+    read _
 }
 
-NORMALIZE_DOMAIN() {
-    DOMAIN=$(echo "$TARGET" | sed 's~http[s]*://~~' | sed 's~/.*~~')
+normalize_domain() {
+    DOMAIN=$(echo "$TARGET" | sed 's~http[s]*://~~; s~/.*~~')
 }
 
-GET_IP() {
-    NORMALIZE_DOMAIN
-    echo "[+] Resolving IP for $DOMAIN"
-    dig +short "$DOMAIN" | grep -Eo '([0-9]{1,3}\.){3}[0-9]{1,3}'
+resolve_ip() {
+    normalize_domain
+    echo "[+] Resolving IP (via DNS over HTTP)"
+    curl -s "https://dns.google/resolve?name=$DOMAIN&type=A" \
+    | grep -o '"data":"[^"]*"' \
+    | sed 's/"data":"//;s/"//'
 }
 
-DNS_INFO() {
-    NORMALIZE_DOMAIN
-    echo "[+] DNS records for $DOMAIN"
-    dig "$DOMAIN" ANY +noall +answer
-}
-
-HEADERS() {
+http_headers() {
     echo "[+] HTTP headers"
     curl -I -L -s "$TARGET"
 }
 
+server_info() {
+    echo "[+] Server & technology hints"
+    curl -I -s "$TARGET" | grep -iE "server:|x-powered-by:"
+}
+
+geoip() {
+    IP=$(resolve_ip | head -n 1)
+    if [ -z "$IP" ]; then
+        echo "No IP found"
+        return
+    fi
+    echo "[+] IP geolocation"
+    curl -s "http://ip-api.com/json/$IP" \
+    | sed 's/[{},]/\n/g'
+}
+
+menu() {
+    clear
+    banner
+    echo
+    echo "Target: $TARGET"
+    echo
+    echo "1) Resolve IP"
+    echo "2) HTTP headers"
+    echo "3) Server info"
+    echo "4) IP geolocation"
+    echo "0) Exit"
+    echo
+    printf "Option: "
+    read OPT
+
+    case "$OPT" in
+        1) resolve_ip ;;
+        2) http_headers ;;
+        3) server_info ;;
+        4) geoip ;;
+        0) exit 0 ;;
+        *) echo "Invalid option" ;;
+    esac
+
+    pause
+}
+
+banner
+echo
+printf "Enter website (https://example.com): "
+read TARGET
+
+while true; do
+    menu
+done
 WHOIS_INFO() {
     NORMALIZE_DOMAIN
     echo "[+] Whois info"
