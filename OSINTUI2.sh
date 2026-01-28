@@ -1,13 +1,16 @@
 #!/bin/sh
 
-TARGET="127.0.0.1"
+clear
+echo "==============================="
+echo "     LOCALHOST OSINT UI"
+echo "==============================="
+echo
 
-banner() {
-    echo "==============================="
-    echo "   LOCALHOST OSINT UI"
-    echo "   Passive system inspection"
-    echo "==============================="
-}
+printf "Enter localhost (example: localhost:8080): "
+read TARGET
+
+HOST=$(echo "$TARGET" | cut -d: -f1)
+PORT=$(echo "$TARGET" | cut -d: -f2)
 
 pause() {
     echo
@@ -15,75 +18,29 @@ pause() {
     read _
 }
 
-http_check() {
-    echo "[+] HTTP check on localhost"
-    curl -I -s http://$TARGET 2>/dev/null || echo "No HTTP service"
+http_headers() {
+    echo "[+] HTTP headers from http://$TARGET"
+    curl -I -s "http://$TARGET" 2>/dev/null || echo "No HTTP response"
 }
 
-common_ports() {
-    echo "[+] Common localhost ports"
-    for p in 80 443 3000 5000 8000 8080 9000; do
-        (echo >/dev/tcp/$TARGET/$p) >/dev/null 2>&1 \
-        && echo "Port $p: OPEN" \
-        || echo "Port $p: closed"
-    done
+http_body() {
+    echo "[+] HTTP response body (first lines)"
+    curl -s "http://$TARGET" | head -n 20
 }
 
-listening_ports() {
-    echo "[+] Listening ports"
-    if command -v ss >/dev/null 2>&1; then
-        ss -ltn
-    elif command -v netstat >/dev/null 2>&1; then
-        netstat -ltn
-    elif [ -r /proc/net/tcp ]; then
-        cat /proc/net/tcp
-    else
-        echo "No port listing method available"
-    fi
-}
-
-processes() {
-    echo "[+] Running processes (limited view)"
-    ps 2>/dev/null || echo "ps not available"
-}
-
-system_info() {
-    echo "[+] System info"
-    uname -a 2>/dev/null
-    echo
-    echo "[+] Uptime"
-    cat /proc/uptime 2>/dev/null
+port_check() {
+    echo "[+] Checking port $PORT on $HOST"
+    (echo >/dev/tcp/$HOST/$PORT) >/dev/null 2>&1 \
+        && echo "Port $PORT: OPEN" \
+        || echo "Port $PORT: CLOSED or unavailable"
 }
 
 menu() {
     clear
-    banner
+    echo "Target: $TARGET"
     echo
-    echo "Target: localhost (127.0.0.1)"
-    echo
-    echo "1) HTTP service check"
-    echo "2) Common ports probe"
-    echo "3) Listening ports"
-    echo "4) Running processes"
-    echo "5) System info"
+    echo "1) Check HTTP headers"
+    echo "2) View HTTP response"
+    echo "3) Check port status"
     echo "0) Exit"
     echo
-    printf "> "
-    read OPT
-
-    case "$OPT" in
-        1) http_check ;;
-        2) common_ports ;;
-        3) listening_ports ;;
-        4) processes ;;
-        5) system_info ;;
-        0) exit 0 ;;
-        *) echo "Invalid option" ;;
-    esac
-
-    pause
-}
-
-while true; do
-    menu
-done
